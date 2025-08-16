@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI图像生成器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        secondary: '#8b5cf6',
+                        accent: '#ec4899',
+                        dark: '#1e293b',
+                        light: '#f8fafc'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .gradient-bg {
+                background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            }
+            .card-hover {
+                transition: all 0.3s ease;
+            }
+            .card-hover:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.1), 0 10px 10px -5px rgba(99, 102, 241, 0.04);
+            }
+            .pulse-animation {
+                animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+            @keyframes pulse {
+                0%, 100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.7;
+                }
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+    <!-- 导航栏 -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-picture-o text-2xl" aria-hidden="true"></i>
+                <h1 class="text-2xl font-bold">AI图像生成器</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="feedbackBtn" class="hidden md:block px-4 py-2 rounded-full bg-white/20 hover:bg-white/30 transition-all">
+                    <i class="fa fa-comment-o mr-1" aria-hidden="true"></i> 反馈建议
+                </button>
+                <button id="adminBtn" class="hidden md:block px-4 py-2 rounded-full bg-white/20 hover:bg-white/30 transition-all">
+                    <i class="fa fa-lock mr-1" aria-hidden="true"></i> 管理员
+                </button>
+                <button id="mobileMenuBtn" class="md:hidden text-xl">
+                    <i class="fa fa-bars" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+        <!-- 移动端菜单 -->
+        <div id="mobileMenu" class="hidden md:hidden bg-white/10 backdrop-blur-md">
+            <div class="container mx-auto px-4 py-2 flex flex-col space-y-3">
+                <button id="mobileFeedbackBtn" class="px-4 py-2 text-left">
+                    <i class="fa fa-comment-o mr-2" aria-hidden="true"></i> 反馈建议
+                </button>
+                <button id="mobileAdminBtn" class="px-4 py-2 text-left">
+                    <i class="fa fa-lock mr-2" aria-hidden="true"></i> 管理员
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- 介绍部分 -->
+        <section class="text-center mb-12 max-w-3xl mx-auto">
+            <h2 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold mb-4 text-dark text-shadow">
+                用文字创造图像
+            </h2>
+            <p class="text-gray-600 text-lg mb-6">
+                输入包含指定类别的描述，我们的AI将为你生成对应图像。支持随机生成，探索更多可能！
+            </p>
+        </section>
+
+        <!-- 生成区域 -->
+        <section class="max-w-5xl mx-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- 输入区域 -->
+                <div class="bg-white rounded-2xl shadow-xl p-6 card-hover">
+                    <h3 class="text-xl font-semibold mb-4 text-primary flex items-center">
+                        <i class="fa fa-lightbulb-o mr-2" aria-hidden="true"></i> 创造你的图像
+                    </h3>
+                    
+                    <div class="mb-4">
+                        <label for="prompt" class="block text-gray-700 mb-2">输入描述（例如："一只黑色的狗在草地上奔跑"）</label>
+                        <textarea 
+                            id="prompt" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all resize-none h-32"
+                            placeholder="请输入包含以下类别的描述..."></textarea>
+                        <!-- 数据集类别提示 -->
+                        <div class="mt-2 p-2 bg-blue-50 rounded text-sm text-blue-700 border border-blue-100">
+                            <p class="font-medium">支持的类别：</p>
+                            <p>飞机、汽车、鸟类、猫、鹿、狗、青蛙、马、船、卡车</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-3 mb-6">
+                        <button 
+                            id="generateBtn" 
+                            class="flex-grow bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg transition-all flex items-center justify-center"
+                        >
+                            <i class="fa fa-magic mr-2" aria-hidden="true"></i> 生成图像
+                        </button>
+                        <button 
+                            id="randomGenerateBtn" 
+                            class="flex-grow bg-secondary hover:bg-secondary/90 text-white font-medium py-3 px-6 rounded-lg transition-all flex items-center justify-center"
+                        >
+                            <i class="fa fa-random mr-2" aria-hidden="true"></i> 随机生成
+                        </button>
+                    </div>
+                    
+                    <div id="randomPromptContainer" class="hidden p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p class="text-gray-700"><span class="font-medium text-primary">使用的随机提示词：</span> <span id="randomPromptText"></span></p>
+                    </div>
+                </div>
+                
+                <!-- 结果展示区域 -->
+                <div class="bg-white rounded-2xl shadow-xl p-6 card-hover flex flex-col">
+                    <h3 class="text-xl font-semibold mb-4 text-primary flex items-center">
+                        <i class="fa fa-image mr-2" aria-hidden="true"></i> 生成结果
+                    </h3>
+                    
+                    <div id="imageContainer" class="flex-grow flex items-center justify-center bg-gray-100 rounded-xl overflow-hidden">
+                        <div id="initialState" class="text-center p-8">
+                            <i class="fa fa-picture-o text-6xl text-gray-300 mb-4" aria-hidden="true"></i>
+                            <p class="text-gray-500">生成的图像将显示在这里</p>
+                        </div>
+                        
+                        <div id="loadingState" class="hidden text-center p-8">
+                            <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+                            <p class="text-gray-600">AI正在努力生成图像...</p>
+                        </div>
+                        
+                        <img id="generatedImage" class="hidden max-w-full max-h-full object-contain" src="" alt="生成的图像">
+                    </div>
+                    
+                    <div id="imageActions" class="hidden mt-4 flex justify-center">
+                        <button 
+                            id="saveImageBtn" 
+                            class="bg-accent hover:bg-accent/90 text-white font-medium py-2 px-6 rounded-lg transition-all flex items-center"
+                        >
+                            <i class="fa fa-download mr-2" aria-hidden="true"></i> 保存图像
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 管理员区域 -->
+        <section id="adminSection" class="mt-12 max-w-5xl mx-auto hidden">
+            <!-- 管理员标签页导航 -->
+            <div class="border-b border-gray-200 mb-6">
+                <nav class="-mb-px flex space-x-8">
+                    <button id="feedbackTabBtn" class="admin-tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-primary text-primary font-medium">
+                        <i class="fa fa-comments mr-1" aria-hidden="true"></i> 用户反馈
+                    </button>
+                    <button id="statsTabBtn" class="admin-tab-btn whitespace-nowrap py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                        <i class="fa fa-bar-chart mr-1" aria-hidden="true"></i> 访问统计
+                    </button>
+                </nav>
+            </div>
+            
+            <!-- 管理员反馈区域 -->
+            <div id="adminFeedbackSection" class="bg-white rounded-2xl shadow-xl p-6 card-hover">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-primary flex items-center">
+                        <i class="fa fa-comments mr-2" aria-hidden="true"></i> 用户反馈管理
+                    </h3>
+                    <button id="adminLogoutBtn" class="text-red-500 hover:text-red-600 transition-colors">
+                        <i class="fa fa-sign-out mr-1" aria-hidden="true"></i> 退出管理员模式
+                    </button>
+                </div>
+                
+                <div id="feedbackList" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    <!-- 反馈内容将通过JavaScript动态加载 -->
+                    <div class="text-center text-gray-500 py-8">
+                        暂无用户反馈
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 新增：访问统计区域 -->
+            <div id="adminStatsSection" class="hidden bg-white rounded-2xl shadow-xl p-6 card-hover">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-primary flex items-center">
+                        <i class="fa fa-bar-chart mr-2" aria-hidden="true"></i> 网站访问统计
+                    </h3>
+                    <button id="adminLogoutBtn2" class="text-red-500 hover:text-red-600 transition-colors">
+                        <i class="fa fa-sign-out mr-1" aria-hidden="true"></i> 退出管理员模式
+                    </button>
+                </div>
+                
+                <!-- 统计概览 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <p class="text-sm text-blue-700 mb-1">总访问量</p>
+                        <p id="totalVisits" class="text-3xl font-bold text-blue-800">0</p>
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                        <p class="text-sm text-purple-700 mb-1">活跃天数</p>
+                        <p id="activeDays" class="text-3xl font-bold text-purple-800">0</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg border border-green-100">
+                        <p class="text-sm text-green-700 mb-1">热门页面</p>
+                        <p id="popularPage" class="text-xl font-bold text-green-800">-</p>
+                    </div>
+                </div>
+                
+                <!-- 访问趋势图表 -->
+                <div class="mb-8">
+                    <h4 class="text-lg font-medium mb-4">访问趋势</h4>
+                    <div class="h-64">
+                        <canvas id="visitsChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- 最近访问记录 -->
+                <div>
+                    <h4 class="text-lg font-medium mb-4">最近访问记录</h4>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                                    <th class="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP地址</th>
+                                    <th class="px-3 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">页面</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentVisitsTable" class="bg-white divide-y divide-gray-200">
+                                <!-- 最近访问记录将通过JavaScript动态加载 -->
+                                <tr>
+                                    <td colspan="3" class="px-3 py-8 text-center text-gray-500">暂无访问记录</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-8 mt-12">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <div class="flex items-center justify-center md:justify-start">
+                        <i class="fa fa-picture-o text-2xl mr-2" aria-hidden="true"></i>
+                        <h2 class="text-xl font-bold">AI图像生成器</h2>
+                    </div>
+                    <p class="text-gray-400 mt-2 text-center md:text-left">用人工智能创造无限可能</p>
+                </div>
+                
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-300 hover:text-white transition-colors">
+                        <i class="fa fa-github text-2xl" aria-hidden="true"></i>
+                    </a>
+                    <a href="#" class="text-gray-300 hover:text-white transition-colors">
+                        <i class="fa fa-twitter text-2xl" aria-hidden="true"></i>
+                    </a>
+                    <a href="#" class="text-gray-300 hover:text-white transition-colors">
+                        <i class="fa fa-envelope text-2xl" aria-hidden="true"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-700 mt-6 pt-6 text-center text-gray-400">
+                &copy; 2025 AI图像生成器 | 用技术创造美
+            </div>
+        </div>
+    </footer>
+
+    <!-- 反馈模态框 -->
+    <div id="feedbackModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-primary">提交反馈</h3>
+                <button id="closeFeedbackModal" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl" aria-hidden="true"></i>
+                </button>
+            </div>
+            
+            <form id="feedbackForm">
+                <div class="mb-4">
+                    <label for="feedbackName" class="block text-gray-700 mb-1">姓名（可选）</label>
+                    <input type="text" id="feedbackName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="feedbackEmail" class="block text-gray-700 mb-1">邮箱（可选）</label>
+                    <input type="email" id="feedbackEmail" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="feedbackRating" class="block text-gray-700 mb-2">满意度评分</label>
+                    <div class="flex space-x-1">
+                        <button type="button" class="rating-star text-gray-300 hover:text-yellow-400 text-2xl" data-rating="1">
+                            <i class="fa fa-star" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="rating-star text-gray-300 hover:text-yellow-400 text-2xl" data-rating="2">
+                            <i class="fa fa-star" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="rating-star text-gray-300 hover:text-yellow-400 text-2xl" data-rating="3">
+                            <i class="fa fa-star" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="rating-star text-gray-300 hover:text-yellow-400 text-2xl" data-rating="4">
+                            <i class="fa fa-star" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="rating-star text-gray-300 hover:text-yellow-400 text-2xl" data-rating="5">
+                            <i class="fa fa-star" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label for="feedbackMessage" class="block text-gray-700 mb-1">反馈内容</label>
+                    <textarea id="feedbackMessage" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" required></textarea>
+                </div>
+                
+                <button type="submit" class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg transition-all">
+                    提交反馈
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 管理员登录模态框 -->
+    <div id="adminModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-primary">管理员登录</h3>
+                <button id="closeAdminModal" class="text-gray-500 hover:text-gray-700">
+                    <i class="fa fa-times text-xl" aria-hidden="true"></i>
+                </button>
+            </div>
+            
+            <form id="adminForm">
+                <div class="mb-6">
+                    <label for="adminCode" class="block text-gray-700 mb-1">请输入管理员激活码</label>
+                    <input type="password" id="adminCode" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" required>
+                </div>
+                
+                <button type="submit" class="w-full bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg transition-all">
+                    登录
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 通知提示 -->
+    <div id="notification" class="fixed bottom-4 right-4 bg-dark text-white px-6 py-3 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-50">
+        <i id="notificationIcon" class="fa fa-check-circle mr-2" aria-hidden="true"></i>
+        <span id="notificationMessage"></span>
+    </div>
+
+    <script>
+        // 数据集有效类别
+        const VALID_CLASSES = ["飞机", "汽车", "鸟类", "猫", "鹿", "狗", "青蛙", "马", "船", "卡车"];
+        
+        // 全局变量
+        let currentImageFilename = null;
+        let selectedRating = 3; // 默认评分
+        let visitsChart = null; // 访问统计图表
+        
+        // DOM元素
+        const generateBtn = document.getElementById('generateBtn');
+        const randomGenerateBtn = document.getElementById('randomGenerateBtn');
+        const promptInput = document.getElementById('prompt');
+        const generatedImage = document.getElementById('generatedImage');
+        const initialState = document.getElementById('initialState');
+        const loadingState = document.getElementById('loadingState');
+        const imageActions = document.getElementById('imageActions');
+        const saveImageBtn = document.getElementById('saveImageBtn');
+        const randomPromptContainer = document.getElementById('randomPromptContainer');
+        const randomPromptText = document.getElementById('randomPromptText');
+        
+        // 模态框相关
+        const feedbackBtn = document.getElementById('feedbackBtn');
+        const mobileFeedbackBtn = document.getElementById('mobileFeedbackBtn');
+        const feedbackModal = document.getElementById('feedbackModal');
+        const closeFeedbackModal = document.getElementById('closeFeedbackModal');
+        const feedbackForm = document.getElementById('feedbackForm');
+        const ratingStars = document.querySelectorAll('.rating-star');
+        
+        const adminBtn = document.getElementById('adminBtn');
+        const mobileAdminBtn = document.getElementById('mobileAdminBtn');
+        const adminModal = document.getElementById('adminModal');
+        const closeAdminModal = document.getElementById('closeAdminModal');
+        const adminForm = document.getElementById('adminForm');
+        const adminSection = document.getElementById('adminSection');
+        const adminFeedbackSection = document.getElementById('adminFeedbackSection');
+        const adminStatsSection = document.getElementById('adminStatsSection');
+        const feedbackList = document.getElementById('feedbackList');
+        const adminLogoutBtn = document.getElementById('adminLogoutBtn');
+        const adminLogoutBtn2 = document.getElementById('adminLogoutBtn2');
+        
+        // 管理员标签页
+        const feedbackTabBtn = document.getElementById('feedbackTabBtn');
+        const statsTabBtn = document.getElementById('statsTabBtn');
+        
+        // 统计数据元素
+        const totalVisitsEl = document.getElementById('totalVisits');
+        const activeDaysEl = document.getElementById('activeDays');
+        const popularPageEl = document.getElementById('popularPage');
+        const recentVisitsTable = document.getElementById('recentVisitsTable');
+        
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const mobileMenu = document.getElementById('mobileMenu');
+        
+        // 通知相关
+        const notification = document.getElementById('notification');
+        const notificationMessage = document.getElementById('notificationMessage');
+        const notificationIcon = document.getElementById('notificationIcon');
+        
+        // 显示通知
+        function showNotification(message, isSuccess = true) {
+            notificationMessage.textContent = message;
+            notificationIcon.className = isSuccess ? 
+                'fa fa-check-circle mr-2 text-green-400' : 
+                'fa fa-exclamation-circle mr-2 text-red-400';
+            
+            notification.classList.remove('translate-y-20', 'opacity-0');
+            notification.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                notification.classList.remove('translate-y-0', 'opacity-100');
+                notification.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+        
+        // 验证输入是否包含有效类别
+        function hasValidClass(input) {
+            const text = input.trim();
+            return VALID_CLASSES.some(cls => text.includes(cls));
+        }
+        
+        // 生成图像
+        async function generateImage(prompt) {
+            // 若用户输入，先验证是否包含有效类别
+            if (prompt && !hasValidClass(prompt)) {
+                showNotification(`描述中必须包含以下类别之一：${VALID_CLASSES.join('、')}`, false);
+                return;
+            }
+            
+            // 显示加载状态
+            initialState.classList.add('hidden');
+            generatedImage.classList.add('hidden');
+            imageActions.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+            
+            try {
+                let response;
+                if (prompt) {
+                    // 使用用户提供的提示词（已通过验证）
+                    response = await fetch('/generate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ prompt: prompt })
+                    });
+                    randomPromptContainer.classList.add('hidden');
+                } else {
+                    // 随机生成（后端确保包含有效类别）
+                    response = await fetch('/generate-random');
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 更新图像
+                    generatedImage.src = data.image_url;
+                    currentImageFilename = data.image_url.split('/').pop();
+                    
+                    // 如果是随机生成，显示使用的提示词
+                    if (data.prompt) {
+                        randomPromptText.textContent = data.prompt;
+                        randomPromptContainer.classList.remove('hidden');
+                    }
+                    
+                    // 显示图像和操作按钮
+                    loadingState.classList.add('hidden');
+                    generatedImage.classList.remove('hidden');
+                    imageActions.classList.remove('hidden');
+                } else {
+                    showNotification(data.error || '生成图像失败', false);
+                    loadingState.classList.add('hidden');
+                    initialState.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('生成图像出错:', error);
+                showNotification('生成图像时发生错误', false);
+                loadingState.classList.add('hidden');
+                initialState.classList.remove('hidden');
+            }
+        }
+        
+        // 加载用户反馈
+        async function loadFeedback() {
+            try {
+                const response = await fetch('/admin/feedback');
+                const data = await response.json();
+                
+                if (data.success && data.feedback && data.feedback.length > 0) {
+                    feedbackList.innerHTML = '';
+                    
+                    data.feedback.forEach(feedback => {
+                        const date = new Date(feedback.timestamp).toLocaleString();
+                        const feedbackItem = document.createElement('div');
+                        feedbackItem.className = 'p-4 border border-gray-200 rounded-lg bg-gray-50';
+                        
+                        // 生成星级评分显示
+                        let ratingHtml = '';
+                        for (let i = 1; i <= 5; i++) {
+                            ratingHtml += `<i class="fa fa-star ${i <= feedback.rating ? 'text-yellow-400' : 'text-gray-300'}"></i>`;
+                        }
+                        
+                        feedbackItem.innerHTML = `
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-medium">${feedback.username || '匿名用户'}</h4>
+                                <span class="text-sm text-gray-500">${date}</span>
+                            </div>
+                            <div class="mb-2">${ratingHtml}</div>
+                            <p class="text-gray-700">${feedback.message}</p>
+                            ${feedback.email ? `<p class="text-sm text-gray-500 mt-1">邮箱: ${feedback.email}</p>` : ''}
+                        `;
+                        
+                        feedbackList.appendChild(feedbackItem);
+                    });
+                } else {
+                    feedbackList.innerHTML = `
+                        <div class="text-center text-gray-500 py-8">
+                            暂无用户反馈
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('加载反馈出错:', error);
+                feedbackList.innerHTML = `
+                    <div class="text-center text-red-500 py-8">
+                        加载反馈失败
+                    </div>
+                `;
+            }
+        }
+        
+        // 新增：加载访问统计
+        async function loadStats() {
+            try {
+                const response = await fetch('/admin/stats');
+                const data = await response.json();
+                
+                if (data.success && data.stats) {
+                    const stats = data.stats;
+                    
+                    // 更新统计概览
+                    totalVisitsEl.textContent = stats.total_visits;
+                    activeDaysEl.textContent = Object.keys(stats.daily_visits).length;
+                    
+                    // 更新热门页面
+                    const firstPage = Object.keys(stats.popular_pages)[0];
+                    if (firstPage) {
+                        popularPageEl.textContent = `${firstPage} (${stats.popular_pages[firstPage]}次)`;
+                    }
+                    
+                    // 更新最近访问记录
+                    if (stats.recent_visits && stats.recent_visits.length > 0) {
+                        recentVisitsTable.innerHTML = '';
+                        stats.recent_visits.forEach(visit => {
+                            const row = document.createElement('tr');
+                            const date = new Date(visit.timestamp).toLocaleString();
+                            
+                            row.innerHTML = `
+                                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900">${date}</td>
+                                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">${visit.ip}</td>
+                                <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-500">${visit.path}</td>
+                            `;
+                            
+                            recentVisitsTable.appendChild(row);
+                        });
+                    } else {
+                        recentVisitsTable.innerHTML = `
+                            <tr>
+                                <td colspan="3" class="px-3 py-8 text-center text-gray-500">暂无访问记录</td>
+                            </tr>
+                        `;
+                    }
+                    
+                    // 绘制访问趋势图表
+                    drawVisitsChart(stats.daily_visits);
+                }
+            } catch (error) {
+                console.error('加载统计数据出错:', error);
+            }
+        }
+        
+        // 新增：绘制访问趋势图表
+        function drawVisitsChart(dailyVisits) {
+            // 销毁现有图表
+            if (visitsChart) {
+                visitsChart.destroy();
+            }
+            
+            // 准备图表数据
+            const ctx = document.getElementById('visitsChart').getContext('2d');
+            
+            // 按日期排序
+            const sortedDates = Object.keys(dailyVisits).sort((a, b) => new Date(a) - new Date(b));
+            const visitCounts = sortedDates.map(date => dailyVisits[date]);
+            
+            // 创建图表
+            visitsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: [{
+                        label: '访问量',
+                        data: visitCounts,
+                        backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                        borderColor: 'rgba(99, 102, 241, 1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 事件监听器
+        generateBtn.addEventListener('click', () => {
+            const prompt = promptInput.value.trim();
+            if (prompt) {
+                generateImage(prompt); // 内部会验证
+            } else {
+                showNotification('请输入提示词', false);
+            }
+        });
+        
+        randomGenerateBtn.addEventListener('click', () => {
+            generateImage(null); // 随机生成由后端确保包含有效类别
+        });
+        
+        saveImageBtn.addEventListener('click', () => {
+            if (currentImageFilename) {
+                window.location.href = `/save-image/${currentImageFilename}`;
+            }
+        });
+        
+        // 反馈模态框
+        function openFeedbackModal() {
+            feedbackModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeFeedbackModalFunc() {
+            feedbackModal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        
+        feedbackBtn.addEventListener('click', openFeedbackModal);
+        mobileFeedbackBtn.addEventListener('click', () => {
+            mobileMenu.classList.add('hidden');
+            openFeedbackModal();
+        });
+        closeFeedbackModal.addEventListener('click', closeFeedbackModalFunc);
+        
+        // 评分星星
+        ratingStars.forEach(star => {
+            star.addEventListener('click', () => {
+                selectedRating = parseInt(star.getAttribute('data-rating'));
+                
+                // 更新星星显示
+                ratingStars.forEach(s => {
+                    const sRating = parseInt(s.getAttribute('data-rating'));
+                    if (sRating <= selectedRating) {
+                        s.classList.remove('text-gray-300');
+                        s.classList.add('text-yellow-400');
+                    } else {
+                        s.classList.remove('text-yellow-400');
+                        s.classList.add('text-gray-300');
+                    }
+                });
+            });
+            
+            // 鼠标悬停效果
+            star.addEventListener('mouseover', () => {
+                const hoverRating = parseInt(star.getAttribute('data-rating'));
+                ratingStars.forEach(s => {
+                    const sRating = parseInt(s.getAttribute('data-rating'));
+                    if (sRating <= hoverRating) {
+                        s.classList.add('text-yellow-400');
+                    }
+                });
+            });
+            
+            star.addEventListener('mouseout', () => {
+                ratingStars.forEach(s => {
+                    const sRating = parseInt(s.getAttribute('data-rating'));
+                    if (sRating <= selectedRating) {
+                        s.classList.add('text-yellow-400');
+                    } else {
+                        s.classList.remove('text-yellow-400');
+                    }
+                });
+            });
+        });
+        
+        // 提交反馈
+        feedbackForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('feedbackName').value.trim();
+            const email = document.getElementById('feedbackEmail').value.trim();
+            const message = document.getElementById('feedbackMessage').value.trim();
+            
+            if (!message) {
+                showNotification('请输入反馈内容', false);
+                return;
+            }
+            
+            try {
+                const response = await fetch('/submit-feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username,
+                        email,
+                        message,
+                        rating: selectedRating
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(data.message);
+                    feedbackForm.reset();
+                    // 重置评分
+                    selectedRating = 3;
+                    ratingStars.forEach(s => {
+                        const sRating = parseInt(s.getAttribute('data-rating'));
+                        if (sRating <= selectedRating) {
+                            s.classList.add('text-yellow-400');
+                        } else {
+                            s.classList.remove('text-yellow-400');
+                        }
+                    });
+                    closeFeedbackModalFunc();
+                } else {
+                    showNotification(data.error || '提交反馈失败', false);
+                }
+            } catch (error) {
+                console.error('提交反馈出错:', error);
+                showNotification('提交反馈时发生错误', false);
+            }
+        });
+        
+        // 管理员模态框
+        function openAdminModal() {
+            adminModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeAdminModalFunc() {
+            adminModal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        
+        adminBtn.addEventListener('click', openAdminModal);
+        mobileAdminBtn.addEventListener('click', () => {
+            mobileMenu.classList.add('hidden');
+            openAdminModal();
+        });
+        closeAdminModal.addEventListener('click', closeAdminModalFunc);
+        
+        // 管理员登录
+        adminForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const code = document.getElementById('adminCode').value.trim();
+            
+            try {
+                const response = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ code })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(data.message);
+                    closeAdminModalFunc();
+                    adminForm.reset();
+                    
+                    // 显示管理员区域并加载数据
+                    adminSection.classList.remove('hidden');
+                    loadFeedback();
+                    loadStats();
+                } else {
+                    showNotification(data.message || '登录失败', false);
+                }
+            } catch (error) {
+                console.error('管理员登录出错:', error);
+                showNotification('登录时发生错误', false);
+            }
+        });
+        
+        // 管理员登出
+        function adminLogout() {
+            fetch('/admin/logout')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification(data.message);
+                        adminSection.classList.add('hidden');
+                    } else {
+                        showNotification('退出失败', false);
+                    }
+                })
+                .catch(error => {
+                    console.error('管理员登出出错:', error);
+                    showNotification('登出时发生错误', false);
+                });
+        }
+        
+        adminLogoutBtn.addEventListener('click', adminLogout);
+        adminLogoutBtn2.addEventListener('click', adminLogout);
+        
+        // 管理员标签页切换
+        feedbackTabBtn.addEventListener('click', () => {
+            // 更新按钮样式
+            feedbackTabBtn.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            feedbackTabBtn.classList.add('border-primary', 'text-primary');
+            
+            statsTabBtn.classList.remove('border-primary', 'text-primary');
+            statsTabBtn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            
+            // 显示对应内容
+            adminFeedbackSection.classList.remove('hidden');
+            adminStatsSection.classList.add('hidden');
+        });
+        
+        statsTabBtn.addEventListener('click', () => {
+            // 更新按钮样式
+            statsTabBtn.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            statsTabBtn.classList.add('border-primary', 'text-primary');
+            
+            feedbackTabBtn.classList.remove('border-primary', 'text-primary');
+            feedbackTabBtn.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            
+            // 显示对应内容
+            adminStatsSection.classList.remove('hidden');
+            adminFeedbackSection.classList.add('hidden');
+            
+            // 刷新统计数据
+            loadStats();
+        });
+        
+        // 移动端菜单
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+        });
+        
+        // 检查是否是管理员模式
+        async function checkAdminStatus() {
+            try {
+                const response = await fetch('/admin/feedback');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        adminSection.classList.remove('hidden');
+                        loadFeedback();
+                        loadStats();
+                    }
+                }
+            } catch (error) {
+                // 非管理员，忽略错误
+            }
+        }
+        
+        // 页面加载时检查管理员状态
+        checkAdminStatus();
+    </script>
+</body>
+</html>

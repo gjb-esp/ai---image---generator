@@ -1,0 +1,1 @@
+web: gunicorn app:app --timeout 120  # app:app 指 Flask 实例名（app = Flask(__name__)）
